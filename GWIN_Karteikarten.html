@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GWIN Karteikarten</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#16202e;
+    --ink-soft:#4a5768;
+    --ink-faint:#8794a5;
+    --paper:#eceae3;
+    --card:#ffffff;
+    --navy:#22375c;
+    --hl-green:#c6f24a;
+    --hl-yellow:#ffe74d;
+    --line:#d8d4c9;
+    --radius:14px;
+    --display:'Space Grotesk','Segoe UI',system-ui,sans-serif;
+    --body:'IBM Plex Sans','Segoe UI',system-ui,sans-serif;
+    --mono:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--body);
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    padding:22px 18px 40px;
+    display:flex;
+    justify-content:center;
+  }
+  .wrap{width:100%;max-width:760px;}
+
+  /* ---------- Kopfzeile ---------- */
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px;}
+  h1{
+    font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:-.5px;
+    margin:0;line-height:1.1;
+  }
+  .sub{font-family:var(--mono);font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--ink-faint);margin-top:5px;}
+  .tally{font-family:var(--mono);font-size:11px;color:var(--ink-soft);text-align:right;line-height:1.7;white-space:nowrap;}
+  .tally b{color:var(--ink);font-size:15px;}
+
+  /* ---------- Filter ---------- */
+  .filters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+  .chip{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.5px;
+    background:transparent;color:var(--ink-soft);
+    border:1px solid var(--line);border-radius:20px;
+    padding:5px 11px;cursor:pointer;transition:.16s;
+  }
+  .chip:hover{border-color:var(--ink-faint);color:var(--ink);}
+  .chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff;}
+  .chip:focus-visible,button:focus-visible{outline:2.5px solid var(--navy);outline-offset:2px;}
+
+  .toggles{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px;}
+  .switch{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-family:var(--mono);font-size:10.5px;letter-spacing:.5px;color:var(--ink-soft);}
+  .switch input{position:absolute;opacity:0;width:0;height:0;}
+  .track{width:30px;height:17px;border-radius:20px;background:#cdc9be;position:relative;transition:.18s;flex:none;}
+  .track::after{content:"";position:absolute;top:2.5px;left:2.5px;width:12px;height:12px;border-radius:50%;background:#fff;transition:.18s;}
+  .switch input:checked + .track{background:var(--navy);}
+  .switch input:checked + .track::after{transform:translateX(13px);}
+  .switch input:focus-visible + .track{outline:2.5px solid var(--navy);outline-offset:2px;}
+  .linkbtn{
+    background:none;border:none;padding:0;cursor:pointer;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.5px;color:var(--ink-soft);
+    border-bottom:1px solid var(--line);
+  }
+  .linkbtn:hover{color:var(--ink);border-color:var(--ink);}
+
+  /* ---------- Fortschritt ---------- */
+  .bar{height:3px;background:#dcd8cd;border-radius:3px;overflow:hidden;margin-bottom:20px;}
+  .bar i{display:block;height:100%;width:0;background:var(--navy);transition:width .3s ease;}
+
+  /* ---------- Kartenstapel ---------- */
+  .stage{position:relative;perspective:1600px;margin-bottom:16px;}
+  .stack{position:absolute;left:0;right:0;top:0;border-radius:var(--radius);background:#fff;border:1px solid var(--line);}
+  .stack.s1{transform:translateY(7px) scale(.985);opacity:.55;}
+  .stack.s2{transform:translateY(14px) scale(.97);opacity:.3;}
+
+  .card{position:relative;transform-style:preserve-3d;transition:transform .5s cubic-bezier(.4,.05,.2,1);cursor:pointer;}
+  .card.flipped{transform:rotateY(180deg);}
+  .face{
+    position:absolute;top:0;left:0;width:100%;
+    -webkit-backface-visibility:hidden;backface-visibility:hidden;
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:0 1px 2px rgba(22,32,46,.05),0 8px 24px -12px rgba(22,32,46,.18);
+    overflow:hidden;
+  }
+  .face.back{transform:rotateY(180deg);}
+  .inner{padding:26px 28px 30px;}
+
+  .meta{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:18px;}
+  .kat{font-family:var(--mono);font-size:10px;letter-spacing:1.3px;text-transform:uppercase;color:var(--navy);}
+  .side{font-family:var(--mono);font-size:10px;letter-spacing:1.3px;text-transform:uppercase;color:var(--ink-faint);}
+  .done-flag{color:#4f7a1e;}
+
+  .q{font-family:var(--display);font-weight:700;font-size:21px;line-height:1.32;letter-spacing:-.2px;margin:0;}
+  .hint{font-family:var(--mono);font-size:10px;letter-spacing:.6px;color:var(--ink-faint);margin-top:20px;}
+
+  .a{margin:0;padding:0;list-style:none;}
+  .a li{
+    position:relative;padding-left:17px;margin-bottom:9px;
+    font-size:15.5px;line-height:1.5;
+  }
+  .a li:last-child{margin-bottom:0;}
+  .a li::before{
+    content:"";position:absolute;left:0;top:9px;
+    width:6px;height:6px;border-radius:1px;background:var(--navy);
+  }
+  .a li.plain{padding-left:0;font-size:15.5px;}
+  .a li.plain::before{display:none;}
+
+  /* Signatur: Textmarker-Strich, wie in der Zusammenfassung */
+  mark{
+    background:linear-gradient(var(--hl-green),var(--hl-green));
+    background-repeat:no-repeat;background-size:0% 62%;background-position:0 68%;
+    color:inherit;padding:0 1px;
+    transition:background-size .42s cubic-bezier(.2,.7,.3,1);
+  }
+  mark.y{background-image:linear-gradient(var(--hl-yellow),var(--hl-yellow));}
+  .card.flipped mark{background-size:100% 62%;}
+
+  /* ---------- Steuerung ---------- */
+  .controls{display:flex;gap:9px;align-items:stretch;}
+  .btn{
+    font-family:var(--body);font-size:14px;font-weight:600;
+    border:1px solid var(--line);background:#fff;color:var(--ink);
+    border-radius:10px;padding:12px 16px;cursor:pointer;transition:.15s;
+    display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  }
+  .btn:hover{border-color:var(--ink-faint);}
+  .btn:disabled{opacity:.38;cursor:default;}
+  .btn.nav{flex:none;width:48px;font-size:17px;padding:12px 0;}
+  .btn.again{flex:1;}
+  .btn.got{flex:1;background:var(--ink);border-color:var(--ink);color:#fff;}
+  .btn.got:hover{background:#243247;}
+  .kbd{font-family:var(--mono);font-size:9.5px;opacity:.55;border:1px solid currentColor;border-radius:3px;padding:1px 4px;}
+
+  .foot{margin-top:18px;font-family:var(--mono);font-size:10px;letter-spacing:.4px;color:var(--ink-faint);line-height:1.9;}
+
+  /* ---------- Leerer Stapel ---------- */
+  .empty{
+    background:#fff;border:1px dashed var(--line);border-radius:var(--radius);
+    padding:44px 28px;text-align:center;
+  }
+  .empty h2{font-family:var(--display);font-size:19px;margin:0 0 8px;}
+  .empty p{color:var(--ink-soft);font-size:14.5px;margin:0 0 18px;}
+
+  @media (max-width:560px){
+    body{padding:16px 12px 32px;}
+    h1{font-size:22px;}
+    .inner{padding:22px 20px 26px;}
+    .q{font-size:19px;}
+    .a li{font-size:15px;}
+    .tally{text-align:left;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .card,.bar i,mark{transition:none;}
+    .card.flipped mark{background-size:100% 62%;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Grundlagen der Wirtschaftsinformatik</h1>
+      <div class="sub">Karteikarten · Vorlesung 2 – 10</div>
+    </div>
+    <div class="tally">
+      <b id="tPos">1</b> / <span id="tTotal">0</span> im Stapel<br>
+      <span id="tDone">0</span> als gewusst markiert
+    </div>
+  </header>
+
+  <div class="filters" id="filters" role="group" aria-label="Thema wählen"></div>
+
+  <div class="toggles">
+    <label class="switch">
+      <input type="checkbox" id="onlyOpen">
+      <span class="track"></span>
+      Nur offene Karten
+    </label>
+    <button class="linkbtn" id="shuffle">Mischen</button>
+    <button class="linkbtn" id="reset">Fortschritt zurücksetzen</button>
+  </div>
+
+  <div class="bar"><i id="barFill"></i></div>
+
+  <div id="stageWrap">
+    <div class="stage" id="stage">
+      <div class="stack s2" id="stack2"></div>
+      <div class="stack s1" id="stack1"></div>
+      <div class="card" id="card" tabindex="0" role="button" aria-label="Karte umdrehen">
+        <div class="face front"><div class="inner" id="frontInner"></div></div>
+        <div class="face back"><div class="inner" id="backInner"></div></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn nav" id="prev" aria-label="Vorherige Karte">←</button>
+      <button class="btn again" id="again">Nochmal üben <span class="kbd">1</span></button>
+      <button class="btn got" id="got">Gewusst <span class="kbd">2</span></button>
+      <button class="btn nav" id="next" aria-label="Nächste Karte">→</button>
+    </div>
+
+    <div class="foot">
+      Leertaste dreht die Karte um · Pfeiltasten blättern · 1 = nochmal üben · 2 = gewusst
+    </div>
+  </div>
+
+  <div class="empty" id="empty" style="display:none">
+    <h2>Stapel durchgearbeitet</h2>
+    <p id="emptyMsg">Alle Karten in dieser Auswahl sind als gewusst markiert.</p>
+    <button class="btn" id="emptyReset" style="display:inline-flex">Nochmal von vorn</button>
+  </div>
+
+</div>
+
+<script>
+/* ============================================================
+   Karteninhalte — direkt aus der Zusammenfassung
+   ============================================================ */
+const CARDS = [
+
+/* ---------- Vorlesung 2 · BWL-Grundlagen ---------- */
+{k:"V2 · BWL-Grundlagen", q:"Neoklassische Wirtschaftstheorie: Welches Menschenbild und welche Annahmen?", a:[
+ "Menschenbild: <mark>Homo oeconomicus</mark> — die ideale Welt",
+ "Nutzen maximieren",
+ "Rationales Verhalten",
+ "Stabile Präferenzen",
+ "Keine Transaktionskosten",
+ "Vollständig informiert",
+ "Unendliche Verarbeitung von Wissen"]},
+
+{k:"V2 · BWL-Grundlagen", q:"Neue Institutionenökonomik: Welche Annahmen?", a:[
+ "Menschenbild: <mark>individuelle Nutzenmaximierung</mark> — die reale Welt",
+ "Handelt nicht immer fair",
+ "Es werden nicht immer die besten Entscheidungen getroffen",
+ "Interessen können sich ändern",
+ "Kosten werden auftreten",
+ "Beschränkte Informationen",
+ "Begrenzte Wissensverarbeitung — man hat alle Infos, kommt aber nicht auf alle"]},
+
+{k:"V2 · BWL-Grundlagen", q:"Neoklassik oder Neue Institutionenökonomik — worin liegt der Kernunterschied?", a:[
+ "Die Neoklassik beschreibt eine <mark>ideale Welt</mark>: perfekte Information, keine Kosten, immer rational.",
+ "Die Neue Institutionenökonomik beschreibt die <mark class='y'>reale Welt</mark>: unvollständige Information, Transaktionskosten, begrenzte Rationalität."]},
+
+{k:"V2 · BWL-Grundlagen", q:"Theorie der Verfügungsrechte: Welche vier Rechte gibt es?", a:[
+ "<mark>Recht zur Nutzung</mark> — du darfst die Sache nutzen",
+ "<mark>Recht auf Einnahmen</mark> — damit Geld einnehmen",
+ "<mark>Recht zur Veränderung</mark> — es verändern",
+ "<mark>Recht auf Verkauf/Verwertung</mark> — verkaufen oder Ähnliches"]},
+
+{k:"V2 · BWL-Grundlagen", q:"Was besagt die Transaktionskostentheorie?", a:[
+ "Jeder Austausch verursacht neben dem eigentlichen Preis <mark>zusätzliche Kosten</mark>.",
+ "Diese entstehen beim Suchen, Verhandeln, Abwickeln und Kontrollieren.",
+ "Zusammen sind das die <mark class='y'>Transaktionskosten</mark>."]},
+
+{k:"V2 · BWL-Grundlagen", q:"Transaktionskosten: Wann selbst machen, wann kaufen?", a:[
+ "Kosten <mark>hoch</mark> → lieber selbst machen",
+ "Kosten <mark class='y'>niedrig</mark> → lieber kaufen"]},
+
+{k:"V2 · BWL-Grundlagen", q:"Principal-Agent-Theorie: Wie sieht die Grundkonstellation aus?", a:[
+ "Jemand (<mark>Prinzipal</mark>) beauftragt einen anderen (<mark class='y'>Agent</mark>).",
+ "Der Agent weiß mehr als der Prinzipal → <mark>Informationsasymmetrie</mark>.",
+ "Er kann nicht vollständig kontrolliert werden.",
+ "Der Agent könnte das ausnutzen und im eigenen Interesse handeln."]},
+
+{k:"V2 · BWL-Grundlagen", q:"Principal-Agent-Theorie: Was sind die drei Hauptprobleme?", a:[
+ "<mark>Unbekannte Merkmale</mark> — man kennt den Agenten nicht vollständig (vor Vertrag)",
+ "<mark>Unbekannte Handlungen</mark> — man sieht nicht, was der Agent tut (nach Vertrag)",
+ "<mark>Unbekannte Absichten</mark> — man weiß nicht, was der Agent vorhat (nach Vertrag)"]},
+
+{k:"V2 · BWL-Grundlagen", q:"Principal-Agent-Theorie: Was ist das Ziel des Prinzipals?", a:[
+ "Die drei Probleme minimieren — durch <mark>Kontrolle</mark>, <mark>Anreize</mark> und <mark>bessere Information</mark>."]},
+
+/* ---------- Kapitel 3 · Infrastrukturen ---------- */
+{k:"K3 · Infrastrukturen", q:"Hardwarearchitektur nach John von Neumann: Was ist die Kernaussage?", a:[
+ "Programme und Daten teilen sich <mark>einen Speicherbereich</mark>.",
+ "Sie ist das <mark class='y'>Referenzmodell</mark> für die meisten heutigen Computer."]},
+
+{k:"K3 · Infrastrukturen", q:"Aus welchen Komponenten besteht die Von-Neumann-Architektur?", a:[
+ "<mark>CPU</mark> — bestehend aus Steuerwerk und Rechenwerk",
+ "<mark>Speicherwerk</mark>",
+ "<mark>Ein-/Ausgabewerk</mark>",
+ "Alles verbunden über das <mark class='y'>Bus-System</mark>"]},
+
+{k:"K3 · Infrastrukturen", q:"Was ist ein Speicherwerk technisch gesehen?", a:[
+ "<mark>Elektrische Schaltungen mit zwei Spannungszuständen</mark>, die Nullen und Einsen darstellen und so Daten speichern."]},
+
+{k:"K3 · Infrastrukturen", q:"Welche drei Formen der Speicherdauer gibt es?", a:[
+ "<mark>Flüchtig</mark> — SDRAM",
+ "<mark>Permanent</mark> — ROM",
+ "<mark>Semi-permanent</mark> — USB-Stick"]},
+
+{k:"K3 · Infrastrukturen", q:"Welche Arten von Speichermedien gibt es?", a:[
+ "<mark>Magnetisch</mark> — Festplatten, Magnetbänder",
+ "<mark>Optisch</mark> — CDs, DVDs, Blu-Ray",
+ "<mark>Elektronisch</mark> als Halbleiterspeicher — RAM, USB-Stick, Handyspeicher"]},
+
+{k:"K3 · Infrastrukturen", q:"Was macht das Steuerwerk?", a:[
+ "Es <mark>steuert den Ablauf von Operationen</mark>, indem es Signale über den Bus an andere Komponenten des Rechners sendet."]},
+
+{k:"K3 · Infrastrukturen", q:"Was macht das Rechenwerk?", a:[
+ "Es ist die <mark>arithmetisch-logische Einheit (ALU)</mark>.",
+ "Sie rechnet und trifft logische Entscheidungen — addieren, subtrahieren oder vergleichen, ob etwas größer/kleiner ist."]},
+
+{k:"K3 · Infrastrukturen", q:"Was besagt das EVA-Prinzip?", a:[
+ "Es liefert die <mark>Grundlage zur Datenverarbeitung</mark>, nach der die Aufgaben in der CPU erledigt werden.",
+ "EVA = <mark class='y'>Eingabe → Verarbeitung → Ausgabe</mark>",
+ "Es lässt sich räumlich und zeitlich unterteilen."]},
+
+{k:"K3 · Infrastrukturen", q:"EVA-Prinzip: Was bedeutet die räumliche Unterteilung?", a:[
+ "Ein Bereich für die <mark>Dateneingabe</mark> — Maus, Tastatur",
+ "Ein Bereich für die <mark>Datenverarbeitung</mark>",
+ "Ein Bereich für die <mark>Datenausgabe</mark>"]},
+
+{k:"K3 · Infrastrukturen", q:"EVA-Prinzip: Was bedeutet die zeitliche Unterteilung?", a:[
+ "Zuerst werden <mark>alle Eingaben erfasst</mark>",
+ "Dann werden alle Eingaben <mark>verarbeitet</mark>",
+ "Zum Schluss werden die <mark>Ergebnisse zurückgegeben</mark>"]},
+
+{k:"K3 · Infrastrukturen", q:"Was ist das Bus-System?", a:[
+ "Ein <mark>Bündel elektrischer Leitungen</mark>, an dem alle Hardwarekomponenten <mark class='y'>parallel</mark> angeschlossen sind.",
+ "Es besteht aus drei Bus-Typen: Adressbus, Steuerbus und Datenbus."]},
+
+{k:"K3 · Infrastrukturen", q:"Wofür ist der Adressbus zuständig?", a:[
+ "Er gibt an, <mark>welche Komponente bzw. Speicherstelle gemeint ist</mark>.",
+ "Erst wenn die richtige Adresse übertragen wurde, dürfen Daten ausgetauscht werden."]},
+
+{k:"K3 · Infrastrukturen", q:"Wofür ist der Steuerbus zuständig?", a:[
+ "Er entscheidet, ob Daten <mark>gesendet oder empfangen</mark> werden.",
+ "<mark class='y'>Unidirektional</mark> — nur vom Prozessor zu den Komponenten."]},
+
+{k:"K3 · Infrastrukturen", q:"Wofür ist der Datenbus zuständig?", a:[
+ "Er <mark>überträgt die Daten</mark> zwischen Prozessor und Komponenten.",
+ "<mark class='y'>Bidirektional</mark> — Transfer in beide Richtungen."]},
+
+{k:"K3 · Infrastrukturen", q:"Was ist ein Netzwerk?", a:[
+ "Die <mark>Verbindung zwischen Systemen</mark> durch Nutzung elektronischer Infrastruktur, z. B. Kabel."]},
+
+{k:"K3 · Infrastrukturen", q:"Nach welchen sechs Kriterien lassen sich Netzwerke einteilen?", a:[
+ "<mark>Physikalisch</mark> — Art des Übertragungsmediums: Kabel, WLAN",
+ "<mark>Strukturell</mark> — Topologie: wie die Geräte verbunden sind",
+ "<mark>Geografisch</mark> — Netzausdehnung: lokal oder global",
+ "<mark>Organisatorisch</mark> — Betreiber: privat, staatlich",
+ "<mark>Leistung</mark> — wie schnell ist das Netz?",
+ "<mark>Funktion</mark> — wofür und für wen: Heimnetzwerk, öffentliches Netz"]},
+
+{k:"K3 · Infrastrukturen", q:"Was ist das Internet?", a:[
+ "Das <mark>bestimmende Rechennetz des digitalen Zeitalters</mark>.",
+ "Es wird durch Tausende einzelner, voneinander unabhängiger und miteinander verbundener Netzwerke gebildet.",
+ "Zentrale Technologie: <mark class='y'>TCP/IP</mark> als Vier-Schicht-Modell."]},
+
+{k:"K3 · Infrastrukturen", q:"Welche vier Schichten hat das TCP/IP-Modell und was macht jede?", a:[
+ "<mark>Netzwerk</mark> — verbindet Geräte über Kabel oder Funk und ermöglicht den Zugriff auf deren Daten/Dienste",
+ "<mark>Internet</mark> — gibt jedem Rechner eine eindeutige Adresse und leitet Datenpakete zum richtigen Empfänger weiter",
+ "<mark>Transport</mark> — transportiert die Daten zwischen den Systemen",
+ "<mark>Anwendung</mark> — regelt die Kommunikation zwischen Anwendungen"]},
+
+{k:"K3 · Infrastrukturen", q:"Welche fünf Prinzipien kennzeichnen das Internet?", a:[
+ "<mark>Offenheit</mark> — Protokolle sind öffentlich und für alle nutzbar; niemandem gehört das Internet",
+ "<mark>Redundanz</mark> — zwischen zwei Teilnehmern gibt es mehrere mögliche Pfade",
+ "<mark>Paketorientierung</mark> — Daten werden in Pakete zerlegt und einzeln verschickt",
+ "<mark>Dezentralität</mark> — keine zentrale Steuerstelle, die Kapazität ist auf alle Teilnehmer verteilt",
+ "<mark>Erweiterbarkeit</mark> — dank TCP/IP kommen neue Geräte problemlos dazu"]},
+
+/* ---------- Vorlesung 4 · Vernetzung & Mobilität ---------- */
+{k:"V4 · Vernetzung", q:"Welche vier Merkmale unterscheiden Infrastrukturen?", a:[
+ "<mark>Nutzergruppen</mark> — wer nutzt sie? Unternehmen vs. Privat",
+ "<mark>Ort und Zeit</mark> — stationär vs. mobil",
+ "<mark>Autonomie</mark> — managed vs. autonom",
+ "<mark>Leistungserbringung</mark> — wie entsteht sie, wer ist beteiligt?"]},
+
+{k:"V4 · Vernetzung", q:"Merkmal 1: Vor welchen Herausforderungen stehen Unternehmen bei der Infrastruktur?", a:[
+ "<mark>Digitale Transformation</mark> — kontinuierlich digitalisieren",
+ "Viele verschiedene <mark>Endgeräte</mark>",
+ "<mark>Produkt-IT vs. Prozess-IT</mark> — mit beidem klarkommen",
+ "<mark>Heterogene Anwendungslandschaft</mark> — unterschiedliche Systeme, die nicht zusammenpassen",
+ "<mark>Management der Infrastruktur</mark> — aktive Verwaltung",
+ "<mark>IT-Innovationen</mark> — digital mithalten können"]},
+
+{k:"V4 · Vernetzung", q:"Wie lautet die Lösung für Unternehmen — das Baukasten-Prinzip?", a:[
+ "<mark>Standardisierte, permanent verfügbare Infrastrukturen außerhalb des Unternehmenseigentums</mark> nutzen → Modell des Cloud Computing",
+ "Infrastruktur-Einheiten mit hohem Anteil an digitaler Wertschöpfung bleiben <mark>in Unternehmenshoheit</mark> → Sicherung digitaler Kernkompetenzen",
+ "<mark>Mischung interner und externer</mark> Infrastruktur-Leistungen",
+ "<mark class='y'>Unternehmensarchitektur-Management</mark> sorgt dafür, dass alles zusammenpasst und sinnvoll verwaltet wird"]},
+
+{k:"V4 · Vernetzung", q:"Merkmal 1: Vor welchen Herausforderungen stehen private Nutzer?", a:[
+ "<mark>Kompetenz</mark> für den integrierten Umgang mit unterschiedlichen Zugängen und Endgeräten",
+ "<mark>Datenmanagement</mark> — selbst verwalten",
+ "<mark>Sicherheit und Kontrolle</mark>",
+ "<mark>Investitionsbereitschaft</mark> — in Upgrades investieren",
+ "<mark>Wartung und Support</mark>",
+ "Fazit: Unternehmen haben eine Lösung, der Privatnutzer muss sich um alles selbst kümmern."]},
+
+{k:"V4 · Vernetzung", q:"Merkmal 2: Was kennzeichnet stationäre Infrastruktur?", a:[
+ "Klassische <mark>kabelgebundene Topologie</mark> zur Vernetzung von Computern",
+ "Erfordert eine <mark>physische Verbindung</mark> zum Netzwerk",
+ "Stationäre Endgeräte sind ein <mark class='y'>Auslaufmodell</mark>"]},
+
+{k:"V4 · Vernetzung", q:"Merkmal 2: Was kennzeichnet mobile Infrastruktur?", a:[
+ "Bietet mehr Möglichkeiten an <mark>Interaktion und Transaktion</mark> — einkaufen, zahlen",
+ "Endgeräte und Software müssen für den <mark>Erhalt der Sicherheit eingeschränkt</mark> werden",
+ "Ermöglicht Anwendungen wie <mark class='y'>Augmented und Virtual Reality</mark>"]},
+
+{k:"V4 · Vernetzung", q:"Stationär vs. mobil: Was sind jeweils die Vor- und Nachteile?", a:[
+ "<mark>Stationär</mark> (kabelgebunden): + Datensicherheit, + Qualität und Leistung der Übertragungsrate, − hohe Investitionskosten",
+ "<mark class='y'>Mobil</mark> (drahtlos): + einfacher Netzzugang, + flexibler Einsatz, − Sicherheit, − Verfügbarkeit"]},
+
+{k:"V4 · Vernetzung", q:"Wie ist Augmented Reality definiert?", a:[
+ "<mark>Echtzeitabbildung und Erweiterung der Realität</mark> durch computergestützte virtuelle Informationen.",
+ "Beispiel: Handy-Apps wie Snapchat oder Pokémon Go — Projizieren virtueller Dinge in die Realität."]},
+
+{k:"V4 · Vernetzung", q:"Wie ist Virtual Reality definiert?", a:[
+ "Darstellung und gleichzeitige Wahrnehmung einer <mark>nahezu vollständigen computergenerierten und interaktiven Umgebung</mark>.",
+ "Beispiel: virtuelle Spiele, VR-Achterbahn."]},
+
+{k:"V4 · Vernetzung", q:"Merkmal 3 Autonomie: Was unterscheidet managed von autonomer Infrastruktur?", a:[
+ "<mark>Managed</mark>: Ziel ist die Qualitätssicherung der Infrastruktur im Betrieb. Industrialisierung im IT-Management führt zu <mark class='y'>Outsourcing</mark> — Verlagerung zu Rechenzentren, die von Dritten verwaltet werden.",
+ "<mark>Autonom</mark>: kaum personeller Aufwand zur Funktionstüchtigkeit nötig. Eingebettete Systeme oder eigenständige Geräte verbinden sich miteinander für Ausführung, Überwachung, Steuerung und Kontrolle einer Aufgabe."]},
+
+{k:"V4 · Vernetzung", q:"Merkmal 4 Leistungserbringung: Welche drei Rollen gibt es?", a:[
+ "<mark>Hersteller</mark> — Produktion von Hardware, Netzwerk und Software der Kerninfrastruktur",
+ "<mark>Händler</mark> — Vertrieb der Infrastruktur",
+ "<mark>Betreiber</mark> — Betrieb von Infrastruktur-Lösungen",
+ "Bereitgestellt wird das Ganze über eine <mark class='y'>Plattformlösung</mark>."]},
+
+/* ---------- Vorlesung 5 · Informationssysteme ---------- */
+{k:"V5 · Informationssysteme", q:"Wie ist ein Informationssystem definiert?", a:[
+ "Ein System bestehend aus <mark>Menschen und Technik</mark>, das Daten, Informationen und Wissen verarbeitet und bereitstellt."]},
+
+{k:"V5 · Informationssysteme", q:"Was ist die Aufgabe eines Informationssystems?", a:[
+ "Daten und Informationen <mark>sammeln, strukturieren, verarbeiten, bereitstellen und kommunizieren</mark>."]},
+
+{k:"V5 · Informationssysteme", q:"Wo werden Informationssysteme eingesetzt?", a:[
+ "Zur <mark>Entscheidungsfindung, Steuerung und Kontrolle</mark> von Geschäftsprozessen",
+ "Zur <mark>Unterstützung von Innovationen</mark>:",
+ "<mark class='y'>Produktinnovation</mark> — IS hilft, neue oder bessere Produkte zu entwickeln",
+ "<mark class='y'>Prozessinnovation</mark> — IS hilft, Abläufe zu verbessern oder zu automatisieren"]},
+
+{k:"V5 · Informationssysteme", q:"Was bedeuten Aufgabenzentrierung und Informationsfokus bei IS?", a:[
+ "<mark>Aufgabenzentrierung</mark>: Was ist automatisierbar? Ein IS ist für bestimmte Aufgaben gebaut und erledigt diese automatisiert.",
+ "<mark>Informationsfokus</mark>: Informationen sind das zentrale Objekt des IS — die Technik ist nur ein Hilfsmittel."]},
+
+{k:"V5 · Informationssysteme", q:"Nach welchen Kriterien lassen sich Informationssysteme klassifizieren?", a:[
+ "Welche <mark>Aufgaben</mark> erfüllt es?",
+ "Wie sieht der <mark>technische Aufbau</mark> aus — Hard-/Softwarearchitektur?",
+ "<mark>Standard- vs. Individualsysteme</mark>",
+ "<mark>Branchenspezifisch vs. branchenneutral</mark> — nur für Krankenhäuser oder für jedes Unternehmen?"]},
+
+{k:"V5 · Informationssysteme", q:"In welche drei Gruppen werden Informationssysteme eingeteilt?", a:[
+ "<mark>Funktionale IS</mark> — für bestimmte Unternehmensbereiche: Beschaffung &amp; Logistik, Produktion, Marketing &amp; Vertrieb, HR, Rechnungswesen, Management",
+ "<mark>Integrierte IS</mark> — verbinden mehrere Bereiche, innerhalb oder zwischen Unternehmen",
+ "<mark>Sonstige IS</mark> — Kommunikation, Verwaltung und Erzeugung von Inhalten"]},
+
+{k:"V5 · Informationssysteme", q:"Funktionale IS in der Logistik: Was leisten Lagerwirtschaft und Transportverwaltung?", a:[
+ "<mark>Lagerwirtschaft</mark>: Das IS verwaltet den Lagerbestand durch Kontrolle, Bewertung und Inventur und gibt automatisch vor, wie, wann und was inventarisiert werden soll.",
+ "<mark>Transportverwaltung</mark>: Das IS plant die optimalen Transportwege und bestimmt, wie die Fracht am effizientesten beladen wird."]},
+
+{k:"V5 · Informationssysteme", q:"Welche Fragen beantwortet die strategische Produktionsplanung (PPS)?", a:[
+ "Welche <mark>Produkte</mark> sollen hergestellt werden?",
+ "Welche <mark>Mengen</mark>?",
+ "<mark>Wohin</mark>?",
+ "<mark>Produktionstyp</mark> — Massen-, Serien- oder Einzelproduktion?",
+ "<mark>Produktionsprozess</mark> — Werkstatt- oder Fließbandproduktion?"]},
+
+{k:"V5 · Informationssysteme", q:"Welche Fragen beantwortet die operative Produktionsplanung (PPS)?", a:[
+ "<mark>Wann</mark> muss spätestens mit der Produktion begonnen werden?",
+ "Welcher <mark>Auftrag</mark> mit welcher <mark>Maschine</mark>?"]},
+
+{k:"V5 · Informationssysteme", q:"Was leisten Termin- und Kapazitätsplanung in der Produktion?", a:[
+ "<mark>Terminplanung</mark>: Der Arbeitsplan legt fest, wann welcher Schritt in der Produktion stattfindet.",
+ "<mark>Kapazitätsplanung</mark>: Arbeitsschritte werden geplant; das IS prüft, ob die Kapazitätsgrenzen (Maschinen, Ressourcen) eingehalten werden.",
+ "Überschreitet ein Schritt die Grenze, wird er <mark class='y'>zeitlich nach hinten verschoben</mark> — so lange, bis die Ausführung wieder möglich ist."]},
+
+{k:"V5 · Informationssysteme", q:"Marketing &amp; Vertrieb: Welche sieben Kundenprozesse gibt es?", a:[
+ "<mark>Kontaktprozess</mark> (Bedürfnis) — aufs Unternehmen zukommen",
+ "<mark>Auftragsgewinnungsprozess</mark> (Erwägung) — Überlegung, ein Produkt zu erwerben",
+ "<mark>Kaufprozess</mark> (Warenkauf) — Ware wird gekauft",
+ "<mark>Nutzungsprozess</mark> (Verwendung) — Produkt wird genutzt",
+ "<mark>Neuauftragsgewinnungsprozess</mark> (Neuerwägung) — Kunde kauft erneut",
+ "<mark>Abwanderungsprozess</mark> (Enttäuschung) — Kunde entfernt sich",
+ "<mark>Rückgewinnungsprozess</mark> (Wiedererwägung) — Unternehmen will den Kunden zurückgewinnen"]},
+
+{k:"V5 · Informationssysteme", q:"Personalmanagement: Was umfasst die Personalabrechnung?", a:[
+ "<mark>Bruttoabrechnung</mark> — Gesamtgehalt vor Abzügen",
+ "<mark>Nettoabrechnung</mark> — Gehalt nach Abzügen",
+ "<mark>Nachweise und Auswertung</mark> — Gehaltsabrechnung erstellen und auswerten",
+ "<mark>Zahlungsdienst</mark> — Gehalt auszahlen"]},
+
+{k:"V5 · Informationssysteme", q:"Personalmanagement: Was umfassen Personalzeitwirtschaft und Personalentwicklung?", a:[
+ "<mark>Personalzeitwirtschaft</mark>: Erfassung von Arbeitszeit und Prüfung, ob die Ist-Zeit vom Soll abweicht — z. B. Überstunden, Fehlzeiten.",
+ "<mark>Personalentwicklung</mark>: Fähigkeiten der Mitarbeiter erfassen und mit den Unternehmensanforderungen abgleichen; Maßnahmen wie Schulungen planen, um <mark class='y'>Wissenslücken zu schließen</mark>."]},
+
+{k:"V5 · Informationssysteme", q:"Was leisten Führungsinformationssysteme?", a:[
+ "Sie <mark>bereiten Informationen auf</mark> für Führung und Entscheidungsfindung.",
+ "Sammeln und werten Daten <mark>statistisch</mark> aus",
+ "Kombinieren <mark>interne mit externen</mark> Daten",
+ "Wichtigster Faktor: Daten müssen <mark class='y'>aktuell und informativ</mark> sein"]},
+
+{k:"V5 · Informationssysteme", q:"Was leisten entscheidungsunterstützende Systeme?", a:[
+ "Sie <mark>schlagen die beste Entscheidung vor</mark>.",
+ "Vergleichen verschiedene <mark>Handlungsalternativen</mark>",
+ "Wählen die beste Option anhand einer <mark class='y'>Zielfunktion</mark> aus — z. B. niedrigste Kosten, höchster Gewinn"]},
+
+{k:"V5 · Informationssysteme", q:"Integrierte Informationssysteme: Welche drei Integrationsarten gibt es?", a:[
+ "<mark>Geschäftsprozessintegration</mark> — Prozesse verschiedener Bereiche arbeiten zusammen",
+ "<mark>Datenintegration</mark> — bestimmt, welche Daten gemeinsam genutzt werden können; verbessert und beschleunigt die Organisation",
+ "<mark>Funktionsintegration</mark> — Funktionen werden gebündelt statt getrennt, z. B. Datenerfassung und Sachbearbeitung"]},
+
+{k:"V5 · Informationssysteme", q:"Welche Risiken bringt die Integration von Informationssystemen mit sich?", a:[
+ "<mark>Heterogenität der IS</mark> — verschiedene Systeme sprechen unterschiedliche Sprachen",
+ "<mark>Sicherheit der IS</mark> — mehr verbundene Systeme bedeuten ein größeres Sicherheitsrisiko",
+ "<mark>Qualifikation des Personals</mark> — Mitarbeiter müssen damit umgehen können"]},
+
+{k:"V5 · Informationssysteme", q:"Was unterstützt Groupware — und mit welchen drei Funktionen?", a:[
+ "Groupware unterstützt das <mark>gemeinsame Arbeiten in Gruppen</mark>.",
+ "<mark>Kommunikation</mark> — Austausch",
+ "<mark>Koordination</mark> — Abstimmung",
+ "<mark>Kollaboration</mark> — zusammen an etwas arbeiten"]},
+
+{k:"V5 · Informationssysteme", q:"Was leisten Office-Systeme und Content-Management-Systeme?", a:[
+ "<mark>Office-Systeme</mark>: Textverarbeitung, Tabellenkalkulation, Präsentationserstellung, Grafikbearbeitung, Datenbankbearbeitung — z. B. Microsoft Office",
+ "<mark>Content-Management-Systeme</mark>: Verwaltung von Inhalten für Print- und digitale Medien; die <mark class='y'>Trennung von Inhalt, Layout und Struktur</mark> erhöht die Wiederverwendbarkeit"]},
+
+{k:"V5 · Informationssysteme", q:"Was leisten Lern-Management-Systeme?", a:[
+ "Sie unterstützen <mark>E-Learning</mark>.",
+ "Lernziele definieren, Bedürfnisse erkennen, Materialien auswählen, Lernprozesse durchführen",
+ "Beispiel: <mark class='y'>Moodle</mark>"]},
+
+{k:"V5 · Informationssysteme", q:"Was leisten Dokumenten-Management-Systeme und welche Vorteile haben sie?", a:[
+ "Sie verwalten Dokumente komplett: <mark>Erfassung, Strukturierung, Verteilung, Suche, Ausgabe, Zugriff, Bearbeitung und Archivierung</mark>.",
+ "Vorteil <mark class='y'>Betriebsmitteleinsparung</mark> — weniger Papier, Drucker",
+ "Vorteil <mark class='y'>Aktualität und Konsistenz</mark> — alle greifen auf die aktuellste Version zu",
+ "Vorteil <mark class='y'>verkürzte Zugriffszeiten</mark> — schneller auffindbar",
+ "Vorteil <mark class='y'>erhöhte Auskunftsfähigkeit</mark> — schnelleres Antworten und Feedback"]},
+
+{k:"V5 · Informationssysteme", q:"Suchsysteme: Was unterscheidet Pull- von Pushsystemen?", a:[
+ "<mark>Pullsystem</mark>: Der Nutzer fragt aktiv und das System liefert passende Ergebnisse — z. B. Google.",
+ "<mark>Pushsystem</mark>: Das System schickt unaufgefordert Informationen, sobald sie verfügbar sind, ohne dass der Nutzer aktiv sucht — z. B. Push-Benachrichtigungen am Handy."]},
+
+/* ---------- Vorlesung 6 · Daten ---------- */
+{k:"V6 · Daten", q:"Wie sind Daten definiert?", a:[
+ "<mark>Maschinell verarbeitete Zeichen</mark>, welche Objekte der realen Welt beschreiben bzw. repräsentieren und die durch verschiedene Verfahren gewonnen wurden."]},
+
+{k:"V6 · Daten", q:"Daten aus technischer Sicht: Was ist zu wissen?", a:[
+ "Bestehen aus <mark>Binärzeichen</mark> (0, 1)",
+ "Mehrere Binärzeichen werden zu größeren Einheiten zusammengefasst — von <mark>elementaren zu komplexen Datentypen</mark>",
+ "Die <mark class='y'>Verarbeitungsmöglichkeit</mark> steht häufig im Vordergrund"]},
+
+{k:"V6 · Daten", q:"Nach welchen Kriterien werden Daten klassifiziert / Wie kann man sie warnehmen ?", a:[
+ "<mark>Zeichenart bzw. Datentyp</mark>",
+ "<mark>Erscheinungsform</mark> — Ton, Bild, Schrift",
+ "<mark>Formatierung</mark>",
+ "<mark>Stellung im Verarbeitungsprozess</mark> — Eingabe, Ausgabe"]},
+
+{k:"V6 · Daten", q:"Welche vier Datenarten unterscheidet man nach Verwendungszweck?", a:[
+ "<mark>Stammdaten</mark> — seltene Änderung, z. B. Name, Adresse",
+ "<mark>Bewegungsdaten</mark> — häufige Änderung, z. B. Bestellungen",
+ "<mark>Transferdaten</mark> — Austausch zwischen Anwendungssystemen",
+ "<mark>Vormerkdaten</mark> — existieren nur für einen Zeitraum"]},
+
+{k:"V6 · Daten", q:"Was bedeutet Datenmanagement?", a:[
+ "Sich um die Daten kümmern, damit sie in <mark>guter Qualität</mark> dort ankommen, wo sie im Unternehmen gebraucht werden — und dort den größten Nutzen bringen.",
+ "Kurz: dafür sorgen, dass die <mark class='y'>richtigen Daten am richtigen Ort</mark> optimal genutzt werden können."]},
+
+{k:"V6 · Daten", q:"Welche Aufgabenbereiche hat das Datenmanagement?", a:[
+ "<mark>Datenmigration</mark> und Integration in bestehende Systeme --> Daten aus alte Systeme in neue Einbinden",
+ "<mark>Harmonisierung</mark> heterogener Anwendungslandschaften --> 2 fremde systeme zu einem",
+ "Durchführung von <mark>Roll-Outs</mark> — neue Systeme flächendeckend einführen",
+ "<mark>Anpassung bei Gesetzesänderungen --> Daten nach gesetzen anpassen</mark>",
+ "<mark>Systemwechsel und Upgrades</mark>",
+ "Verbesserung der <mark>Datenqualität</mark> und Abschalten von Altsystemen"]},
+
+{k:"V6 · Daten", q:"An welchen sieben Merkmalen misst man die Datenqualität?", a:[
+ "<mark>Glaubwürdigkeit</mark>",
+ "<mark>Fehlerfreiheit</mark>",
+ "<mark>Relevanz</mark>",
+ "<mark>Aktualität</mark>",
+ "<mark>Vollständigkeit</mark>",
+ "<mark>Interpretierbarkeit</mark>",
+ "<mark>Zugänglichkeit</mark>"]},
+
+{k:"V6 · Daten", q:"Woran erkennt man schlechte Datenqualität?", a:[
+ "<mark>Datenfehler</mark>",
+ "<mark>Dubletten</mark>",
+ "<mark>Fehlende Werte</mark>",
+ "<mark>Falsche Formatierung</mark>"]},
+
+{k:"V6 · Daten", q:"Big Data: Was sind Data Warehousing, Data Mining und Textmining?", a:[
+ "<mark>Data Warehousing</mark>: ein zentrales Datenlager, dessen Datenbank speziell fürs Analysieren optimiert ist.",
+ "<mark>Data Mining / Business Intelligence</mark>: Verfahren, um Daten automatisch zu analysieren und Prognosen zu erstellen — eines der wichtigsten Werkzeuge.",
+ "<mark>Textmining</mark>: dasselbe, aber statt Zahlen werden Texte durchsucht und ausgewertet."]},
+
+{k:"V6 · Daten", q:"Big Data: Was bedeuten Preventive Maintenance, Predictive Analytics und Predictive Maintenance?", a:[
+ "<mark>Preventive Maintenance</mark>: vorbeugende Wartung nach Bedarf — verlängert die Lebensdauer, steigert die Effizienz und senkt regelmäßige Wartungskosten.",
+ "<mark>Predictive Analytics</mark>: erkennt Muster und Zusammenhänge, um künftige Ereignisse vorherzusagen und Handlungsoptionen zu bewerten.",
+ "<mark>Predictive-Maintenance-Systeme</mark>: versuchen, Mängel zu erkennen, bevor es zur Störung kommt."]},
+
+{k:"V6 · Daten", q:"Welche Chancen bietet Big Data?", a:[
+ "<mark>Kosten senken</mark> in Marketing/Vertrieb durch effizienteren Ressourceneinsatz",
+ "<mark>Umsatz erhöhen</mark> durch gezieltere Markt- und Verkaufsstrategien, Trendanalysen und Prognosen",
+ "<mark>Produktion optimieren</mark> mithilfe von Maschinen- und Sensordaten",
+ "<mark>Lieferketten verbessern</mark> durch bessere Transportwege",
+ "<mark>Simulation und Vorhersage</mark> — Szenarien durchspielen, bevor man handelt"]},
+
+{k:"V6 · Daten", q:"Welche Risiken bringt Big Data mit sich?", a:[
+ "<mark>Kredit-Scoring</mark> — Menschen werden anhand von Daten bewertet",
+ "<mark>Persönlichkeitsprofile</mark>",
+ "<mark>Marktforschung</mark> — viel Wissen über Kunden sammeln bis hin zur Überwachung",
+ "<mark>Kundenbindungsprogramme</mark> — dasselbe Problem",
+ "<mark>Vollständige Datensammlung</mark> ohne konkrete Anwendungsszenarien",
+ "<mark>Interpretation von Korrelationen</mark> — Zusammenhänge falsch deuten"]},
+
+{k:"V6 · Daten", q:"Was besagt das 5V-Modell von Big Data? / 5 Dimensionen die Big Data defnieren.", a:[
+ "<mark>Volume</mark> — so große Datenmenge, dass normale Methoden nicht mehr reichen",
+ "<mark>Variety</mark> — Vielfalt der Datentypen und -quellen",
+ "<mark>Velocity</mark> — Geschwindigkeit, teils Auswertung in Echtzeit",
+ "<mark>Validity</mark> — Sicherstellung der Datenqualität",
+ "<mark>Value</mark> — Big Data hat hohen Mehrwert für Unternehmen"]},
+
+{k:"V6 · Daten", q:"Wie ist ein Algorithmus definiert?", a:[
+ "Eine eindeutige <mark>Schritt-für-Schritt-Anleitung zur Lösung eines Problems</mark> — so präzise, dass ein Computer sie exakt ausführen kann.",
+ "Aus gegebenen Eingaben wird ein gesuchtes Ergebnis berechnet."]},
+
+/* ---------- Vorlesung 7 · Geschäftsmodelle ---------- */
+{k:"V7 · Geschäftsmodelle", q:"Wie ist ein Geschäftsmodell definiert?", a:[
+ "Es ist die <mark>Grundlogik eines Unternehmens</mark> — es beschreibt, welchen Nutzen es für Kunden und Partner schafft.",
+ "Es beantwortet, wie dieser Nutzen als <mark>Umsatz zurück ans Unternehmen fließt</mark>, also wie Geld verdient wird.",
+ "Der gestiftete Nutzen ermöglicht, sich von Wettbewerbern abzuheben, Kundenbeziehungen zu festigen und einen <mark class='y'>Wettbewerbsvorteil</mark> zu erzielen."]},
+
+{k:"V7 · Geschäftsmodelle", q:"Aus welchen sechs Partialmodellen besteht der Geschäftsmodell-Ansatz nach Wirtz?", a:[
+ "<mark>Marktmodell</mark>",
+ "<mark>Beschaffungsmodell</mark>",
+ "<mark>Leistungserstellungsmodell</mark>",
+ "<mark>Leistungsangebotsmodell</mark>",
+ "<mark>Distributionsmodell</mark>",
+ "<mark>Kapitalmodell</mark>"]},
+
+{k:"V7 · Geschäftsmodelle", q:"Wirtz: Was beschreibt das Marktmodell?", a:[
+ "Es beschreibt die <mark>Struktur der Märkte</mark> und besteht aus zwei Teilen:",
+ "<mark>Wettbewerbsmodell</mark> (Konkurrenz): Wer sind die Konkurrenten und wie verhalten sie sich?",
+ "<mark>Nachfragemodell</mark> (Kundenseite): Welche Leistung wird nachgefragt — und wie viel sind die Kunden bereit zu zahlen?"]},
+
+{k:"V7 · Geschäftsmodelle", q:"Wirtz: Was beschreiben Beschaffungs-, Leistungserstellungs- und Leistungsangebotsmodell?", a:[
+ "<mark>Beschaffungsmodell</mark> (Einkaufsseite): Welche Produktionsfaktoren werden von welchen Lieferanten besorgt?",
+ "<mark>Leistungserstellungsmodell</mark> (Produktion): Kombination von Gütern und Dienstleistungen sowie deren Transformation in Angebotsleistungen.",
+ "<mark>Leistungsangebotsmodell</mark> (Angebot): Welche Leistungen bietet man welcher Kundengruppe an?"]},
+
+{k:"V7 · Geschäftsmodelle", q:"Wirtz: Was beschreiben Distributions- und Kapitalmodell?", a:[
+ "<mark>Distributionsmodell</mark> (Weg zum Kunden): Wie, in welcher Zeit und zu welchem Preis kommen die Produkte vom Anbieter zum Kunden?",
+ "<mark>Kapitalmodell</mark> (Geldseite): beschreibt die finanziellen Ressourcen und Formen der Refinanzierung. Es teilt sich in <mark class='y'>Finanzierungsmodell</mark> (woher kommt das Geld — Quellen des eingesetzten Kapitals) und <mark class='y'>Erlösmodell</mark> (wie und womit verdient man Geld — Erlösformen und -systematik)."]},
+
+{k:"V7 · Geschäftsmodelle", q:"Was besagt das 4C-Modell nach Wirtz?", a:[
+ "Es teilt Geschäftsmodelle im Internet in vier Grundtypen ein, verbunden durch <mark class='y'>Coordination</mark>.",
+ "<mark>Content</mark> — Inhalte bereitstellen: sammeln, auswählen, aufbereiten, anbieten. Beispiel: Nachrichtenseiten, Wikipedia, Streaming",
+ "<mark>Commerce</mark> — Handel und Transaktionen, also Kaufen und Verkaufen. Beispiel: Amazon, Zalando, Online-Shops",
+ "<mark>Context</mark> — Ordnen und auffindbar machen: verfügbare Informationen klassifizieren und systematisieren. Beispiel: Google, Vergleichsportale",
+ "<mark>Connection</mark> — Verbinden: Möglichkeit schaffen, dass Menschen/Systeme in Netzwerken in Austausch treten. Beispiel: soziale Netzwerke, Messenger"]},
+
+/* ---------- Vorlesung 9 · Unternehmensmodellierung ---------- */
+{k:"V9 · Unternehmensmodellierung", q:"Was versteht man unter Unternehmensmodellierung?", a:[
+ "Relevante Aspekte eines Unternehmens werden <mark>in Modellen erfasst und analysiert</mark>, um Probleme zu lösen und das Unternehmen weiterzuentwickeln."]},
+
+{k:"V9 · Unternehmensmodellierung", q:"Was ist 4EM?", a:[
+ "Eine <mark>flexible Methode der Unternehmensmodellierung</mark>, die bei Modellierung, Analyse, Planung und Anpassung eines Unternehmens unterstützt."]},
+
+{k:"V9 · Unternehmensmodellierung", q:"4EM: Welche drei zentralen Aktivitäten gibt es?", a:[
+ "<mark>Analysieren</mark> — IST-Situation erfassen: Wie läuft es aktuell? Wo sind Probleme?",
+ "<mark>Bewerten</mark> — Alternativen diskutieren: Was kann man ändern? Was hat Priorität?",
+ "<mark>Gestalten</mark> — SOLL-Situation entwerfen: Wie soll es zukünftig aussehen?"]},
+
+{k:"V9 · Unternehmensmodellierung", q:"4EM: Was beschreibt das Ziel- und Problemmodell?", a:[
+ "Es beschreibt, <mark>was das Unternehmen erreichen oder vermeiden will</mark>, wann das passieren soll und welche Strategie, Prioritäten und Probleme/Chancen dahinterstecken."]},
+
+{k:"V9 · Unternehmensmodellierung", q:"4EM: Was beschreiben Geschäftsregelmodell und Konzeptmodell?", a:[
+ "<mark>Geschäftsregelmodell</mark>: definiert die Regeln und Richtlinien, die im Unternehmen gelten — abgeleitet aus den Zielen und passend zu den Prozessen.",
+ "<mark>Konzeptmodell</mark>: definiert die Bedeutung wichtiger Begriffe und Informationen, die in den anderen Teilmodellen verwendet werden — damit alle dasselbe darunter verstehen."]},
+
+{k:"V9 · Unternehmensmodellierung", q:"4EM: Was zeigt das Geschäftsprozessmodell?", a:[
+ "Beschreibt, <mark>wie die Prozesse im Unternehmen ablaufen</mark>",
+ "Zeigt, welche Informationen/Materialien dabei verarbeitet werden",
+ "Verdeutlicht, welcher Prozess zu welchem Ziel beiträgt",
+ "Zeigt, wer (Organisationseinheit) mit welchen Ressourcen verantwortlich ist",
+ "Bezieht <mark class='y'>Regeln und Verantwortlichkeiten</mark> mit ein"]},
+
+{k:"V9 · Unternehmensmodellierung", q:"4EM: Was beschreibt das technische Komponenten- und Anforderungsmodell?", a:[
+ "Ein <mark>optionales Modell</mark>, das beschreibt, welche IT-Systeme und Anforderungen nötig sind, um die Ziele und Prozesse technisch umzusetzen."]},
+
+{k:"V9 · Unternehmensmodellierung", q:"Woran erkennt man ein qualitativ hochwertiges Modell?", a:[
+ "Es gibt einen <mark>klaren Überblick</mark>",
+ "Es unterstützt das <mark>Lernen im Unternehmen</mark>",
+ "Es verbessert die <mark>Kommunikation</mark> zwischen allen Beteiligten",
+ "Es bietet eine <mark>strukturierte Basis für Analysen</mark>",
+ "Es macht <mark>IS-Anforderungen einfach ableitbar</mark>"]},
+
+/* ---------- Vorlesung 10 · Prozessmanagement ---------- */
+{k:"V10 · Prozessmanagement", q:"Warum brauchen Unternehmen Prozessmanagement?", a:[
+ "Unternehmen arbeiten in einer <mark>komplexen und sich ständig ändernden Umgebung</mark>.",
+ "Deshalb brauchen sie effiziente Prozesse und müssen diese <mark class='y'>aktiv verbessern</mark>."]},
+
+{k:"V10 · Prozessmanagement", q:"Wie sind Prozess, Management und Prozessmanagement definiert?", a:[
+ "<mark>Prozess</mark>: wandelt Inputs mithilfe von Ressourcen in Outputs um.",
+ "<mark>Management</mark>: alle Aktivitäten, die dafür sorgen, dass eine Organisation gezielt in die richtige Richtung gelenkt wird.",
+ "<mark>Prozessmanagement</mark>: zielorientierte Gestaltung, Steuerung und Durchführung aller Prozesse im Unternehmen."]},
+
+{k:"V10 · Prozessmanagement", q:"Welche Aufgaben hat das Prozessmanagement?", a:[
+ "<mark>Identifikation</mark> — Prozesse erkennen und erfassen",
+ "<mark>Gestaltung</mark> — Prozesse sinnvoll aufbauen",
+ "<mark>Dokumentation</mark> — Prozesse festhalten und beschreiben",
+ "<mark>Implementierung</mark> — Prozesse einführen und umsetzen",
+ "<mark>Steuerung und Verbesserung</mark> — Prozesse überwachen und verbessern",
+ "<mark>Kundenorientierung</mark> — Prozesse nach Kunden ausrichten",
+ "<mark>Organisatorische Aspekte</mark> — Kultur und Struktur berücksichtigen",
+ "Kurzformel: <mark class='y'>Planen → Umsetzen → Verbessern</mark>"]},
+
+{k:"V10 · Prozessmanagement", q:"Prozessmanagement nach Allweyer: Welche vier Phasen durchläuft der Kreislauf?", a:[
+ "<mark>Strategisches Prozessmanagement</mark>",
+ "<mark>Prozessmodellierung</mark>",
+ "<mark>Prozessimplementierung</mark>",
+ "<mark>Prozesscontrolling</mark>",
+ "Das Controlling führt zurück ins strategische Prozessmanagement — es ist ein <mark class='y'>Kreislauf</mark>."]},
+
+{k:"V10 · Prozessmanagement", q:"Was passiert im strategischen Prozessmanagement?", a:[
+ "Prozesse werden an der <mark>Unternehmensstrategie ausgerichtet</mark>, damit sie die Unternehmensziele unterstützen",
+ "Wichtige <mark>Kernprozesse definieren</mark>",
+ "<mark>Unternehmenskultur anpassen</mark>",
+ "<mark>Interne und externe Prozesse festlegen</mark>"]},
+
+{k:"V10 · Prozessmanagement", q:"Was passiert in der Prozessmodellierung?", a:[
+ "Prozesse werden <mark>erfasst, beschrieben und in einem Modell festgehalten</mark>",
+ "<mark>Schwachstellen erkennen</mark> — z. B. zwei Systeme, die nicht miteinander kommunizieren (Medienbruch), oder zu teure Schritte",
+ "<mark>Verbesserungen erarbeiten</mark> — wie könnte man es besser machen?",
+ "<mark>Soll-Prozesse entwerfen</mark> — den verbesserten Prozess aufzeichnen, so wie er zukünftig aussehen soll"]},
+
+{k:"V10 · Prozessmanagement", q:"Was passiert in der Prozessimplementierung?", a:[
+ "<mark>Organisatorische Maßnahmen</mark> vornehmen, damit entworfene Prozesse genutzt werden können",
+ "<mark>Implementierung von IS</mark> — passende Software und Systeme aufsetzen",
+ "<mark>Mitarbeiter einbeziehen</mark> — Veränderungen nicht einfach von oben durchsetzen",
+ "<mark>Mitarbeiter motivieren</mark> — erklären, warum die Änderung sinnvoll ist",
+ "<mark>Partnerunternehmen berücksichtigen</mark> — betrifft der Prozess z. B. Lieferanten, müssen diese eingebunden werden"]},
+
+{k:"V10 · Prozessmanagement", q:"Was passiert im Prozesscontrolling?", a:[
+ "<mark>Überwachung</mark> — laufende Prozesse im Blick behalten",
+ "<mark>Prozesskennzahlen</mark> — messbare Werte, die Probleme frühzeitig erkennen sollen",
+ "<mark>Analyse</mark> — werden die Ziele durch die Ergebnisse erreicht? Wenn nicht → anpassen"]},
+
+{k:"V10 · Prozessmanagement", q:"Welche vier Zielsetzungen hat Prozessmanagement — und welche Herausforderung steckt jeweils dahinter?", a:[
+ "<mark>Transparente Arbeitsabläufe</mark>: Prozesse für alle sichtbar machen. Problem: Mitarbeiter fühlen sich ersetzbar, weil ihr Wissen dokumentiert wird.",
+ "<mark>Interne und externe Kundenorientierung</mark>: alles auf den Kunden ausrichten. Problem: Abteilungen verlieren Macht an Prozessverantwortliche.",
+ "<mark>Möglichkeit der Leistungsmessung</mark>: Prozesse und Mitarbeiter messbar machen. Problem: Mitarbeiter fühlen sich kontrolliert.",
+ "<mark>Effizienz- und Effektivitätssteigerung</mark>: Prozesse schneller und günstiger machen. Problem: Mitarbeiter befürchten Stellenabbau."]},
+
+{k:"V10 · Prozessmanagement", q:"Wie ist ein Geschäftsprozess definiert?", a:[
+ "Eine <mark>geordnete Abfolge von Aktivitäten</mark>, die zusammen eine bestimmte Aufgabe erfüllen.",
+ "Dabei werden <mark>Informationen oder Materialien verarbeitet</mark> und dafür Ressourcen benötigt."]},
+
+{k:"V10 · Prozessmanagement", q:"Wie werden Geschäftsprozesse klassifiziert?", a:[
+ "<mark>Managementprozesse</mark> — Prozesse der Unternehmensleitung, die das Unternehmen lenken und weiterentwickeln. Beispiel: Strategieentwicklung, Unternehmensführung, Produktinnovation",
+ "<mark>Wertschaffende Prozesse</mark> — die Kernprozesse, die direkt Wert für den Kunden schaffen. Beispiel: Produktion, Versand",
+ "<mark>Supportprozesse</mark> — laufen im Hintergrund und ermöglichen, dass die anderen reibungslos funktionieren. Beispiel: Personalmanagement, IT, Controlling"]},
+
+{k:"V10 · Prozessmanagement", q:"Wozu dient die Modellierung von Geschäftsprozessen — und was wird dabei gemacht?", a:[
+ "Prozesse werden aufgezeichnet und dargestellt, um sie besser zu <mark>verstehen, zu verbessern und umzusetzen</mark>.",
+ "Verschiedene <mark>Prozessvarianten identifizieren</mark>",
+ "<mark>Doppelte oder widersprüchliche Schritte</mark> aufdecken",
+ "<mark>Neue Prozesse abbilden</mark>; Modelle erstellen, pflegen und anwenden",
+ "Zweck: <mark class='y'>Organisationsgestaltung verbessern</mark> und <mark class='y'>IS/Anwendungssysteme gestalten</mark>"]},
+
+{k:"V10 · Prozessmanagement", q:"Welche Informationen werden für die Prozessmodellierung benötigt?", a:[
+ "<mark>Aktivitäten</mark> — welche Schritte gibt es?",
+ "<mark>Bearbeitungsfolge</mark> — in welcher Reihenfolge?",
+ "<mark>Ergebnisse</mark> — was kommt dabei raus?",
+ "<mark>Personen und Rollen</mark> — wer macht was?",
+ "<mark>Rechte und Pflichten</mark> — was darf/muss wer tun?"]},
+
+{k:"V10 · Prozessmanagement", q:"Wie sind Modell und Modellierung definiert?", a:[
+ "<mark>Modell</mark>: ein vereinfachtes Abbild der Realität — es werden nur die relevanten Dinge erfasst, nicht alles.",
+ "<mark>Modellierung</mark>: der Prozess, bei dem man die Realität analysiert und in einem Modell abbildet."]},
+
+{k:"V10 · Prozessmanagement", q:"Welche Grundsätze ordnungsgemäßer Modellierung gibt es?", a:[
+ "<mark>Richtigkeit</mark> — das Modell bildet die Realität korrekt ab",
+ "<mark>Relevanz</mark> — es wird aufgenommen, was wichtig ist",
+ "<mark>Wirtschaftlichkeit</mark> — es soll nicht mehr kosten, als es leisten kann",
+ "<mark>Klarheit</mark> — das Modell ist verständlich und übersichtlich",
+ "<mark>Vergleichbarkeit</mark> — Modelle sind miteinander vergleichbar",
+ "<mark>Systematischer Aufbau</mark> — das Modell folgt einer einheitlichen Struktur"]},
+
+{k:"V10 · Prozessmanagement", q:"Welche Darstellformen der Modellierung gibt es?", a:[
+ "<mark>Textform</mark>",
+ "<mark>Tabellenform</mark>",
+ "<mark>Grafische Darstellung</mark> — mit und ohne Verwendung von Notation"]}
+
+];
+
+/* ============================================================
+   Zustand
+   ============================================================ */
+const state = {
+  kat: "Alle",
+  onlyOpen: false,
+  order: CARDS.map((_,i)=>i),
+  pos: 0,
+  flipped: false,
+  known: new Set()
+};
+
+const $ = id => document.getElementById(id);
+const kategorien = ["Alle", ...[...new Set(CARDS.map(c=>c.k))]];
+
+/* ---------- Filter aufbauen ---------- */
+kategorien.forEach(k=>{
+  const b = document.createElement("button");
+  b.className = "chip";
+  b.type = "button";
+  b.textContent = k === "Alle" ? "Alle Themen" : k;
+  b.setAttribute("aria-pressed", k === state.kat);
+  b.onclick = () => { state.kat = k; state.pos = 0; state.flipped = false; syncChips(); render(); };
+  $("filters").appendChild(b);
+});
+function syncChips(){
+  [...$("filters").children].forEach((b,i)=>b.setAttribute("aria-pressed", kategorien[i]===state.kat));
+}
+
+/* ---------- Aktueller Stapel ---------- */
+function deck(){
+  return state.order.filter(i=>{
+    const c = CARDS[i];
+    if(state.kat !== "Alle" && c.k !== state.kat) return false;
+    if(state.onlyOpen && state.known.has(i)) return false;
+    return true;
+  });
+}
+
+/* ---------- Rendern ---------- */
+function render(){
+  const d = deck();
+  const total = d.length;
+
+  $("tTotal").textContent = total;
+  $("tDone").textContent = state.known.size;
+
+  if(total === 0){
+    $("stageWrap").style.display = "none";
+    $("empty").style.display = "block";
+    $("emptyMsg").textContent = state.onlyOpen
+      ? "In dieser Auswahl ist keine Karte mehr offen. Schalte „Nur offene Karten“ aus oder setze den Fortschritt zurück."
+      : "Für dieses Thema gibt es keine Karten.";
+    $("tPos").textContent = "0";
+    $("barFill").style.width = "100%";
+    return;
+  }
+  $("stageWrap").style.display = "";
+  $("empty").style.display = "none";
+
+  if(state.pos >= total) state.pos = total - 1;
+  if(state.pos < 0) state.pos = 0;
+
+  const idx = d[state.pos];
+  const c = CARDS[idx];
+  const isKnown = state.known.has(idx);
+
+  $("tPos").textContent = state.pos + 1;
+  $("barFill").style.width = ((state.pos + 1) / total * 100) + "%";
+
+  $("frontInner").innerHTML =
+    `<div class="meta"><span class="kat">${c.k}</span><span class="side">${isKnown ? '<span class="done-flag">✓ gewusst</span>' : "Frage"}</span></div>
+     <p class="q">${c.q}</p>
+     <div class="hint">Zum Umdrehen tippen</div>`;
+
+  $("backInner").innerHTML =
+    `<div class="meta"><span class="kat">${c.k}</span><span class="side">Antwort</span></div>
+     <ul class="a">${c.a.map(x=>`<li>${x}</li>`).join("")}</ul>`;
+
+  const card = $("card");
+  card.classList.toggle("flipped", state.flipped);
+  card.setAttribute("aria-label", state.flipped ? "Antwort anzeigen, zurückdrehen" : "Karte umdrehen");
+
+  $("prev").disabled = state.pos === 0;
+  $("next").disabled = state.pos === total - 1;
+
+  sizeCard();
+}
+
+function sizeCard(){
+  const h = Math.max($("frontInner").offsetHeight, $("backInner").offsetHeight, 240);
+  $("card").style.height = h + "px";
+  $("stage").style.height = (h + 16) + "px";
+  ["stack1","stack2"].forEach(id => $(id).style.height = h + "px");
+}
+
+/* ---------- Aktionen ---------- */
+function flip(){ state.flipped = !state.flipped; render(); }
+function go(delta){
+  const total = deck().length;
+  const nxt = state.pos + delta;
+  if(nxt < 0 || nxt >= total) return;
+  state.pos = nxt; state.flipped = false; render();
+}
+function mark(isKnown){
+  const d = deck();
+  if(!d.length) return;
+  const idx = d[state.pos];
+  if(isKnown) state.known.add(idx); else state.known.delete(idx);
+
+  if(state.onlyOpen && isKnown){
+    state.flipped = false;
+    render();            // Karte fällt aus dem Stapel, Position bleibt
+  } else if(state.pos < d.length - 1){
+    go(1);
+  } else {
+    state.flipped = false; render();
+  }
+}
+
+$("card").onclick = flip;
+$("card").onkeydown = e => { if(e.key === " " || e.key === "Enter"){ e.preventDefault(); flip(); } };
+$("prev").onclick = () => go(-1);
+$("next").onclick = () => go(1);
+$("again").onclick = () => mark(false);
+$("got").onclick  = () => mark(true);
+
+$("onlyOpen").onchange = e => { state.onlyOpen = e.target.checked; state.pos = 0; state.flipped = false; render(); };
+$("shuffle").onclick = () => {
+  for(let i = state.order.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [state.order[i], state.order[j]] = [state.order[j], state.order[i]];
+  }
+  state.pos = 0; state.flipped = false; render();
+};
+function resetAll(){
+  state.known.clear();
+  state.order = CARDS.map((_,i)=>i);
+  state.pos = 0; state.flipped = false;
+  $("onlyOpen").checked = false; state.onlyOpen = false;
+  render();
+}
+$("reset").onclick = resetAll;
+$("emptyReset").onclick = resetAll;
+
+document.addEventListener("keydown", e => {
+  if(e.target.tagName === "INPUT") return;
+  if(e.key === "ArrowRight"){ e.preventDefault(); go(1); }
+  else if(e.key === "ArrowLeft"){ e.preventDefault(); go(-1); }
+  else if(e.key === "1"){ mark(false); }
+  else if(e.key === "2"){ mark(true); }
+  else if(e.key === " " && e.target === document.body){ e.preventDefault(); flip(); }
+});
+
+window.addEventListener("resize", sizeCard);
+if(document.fonts && document.fonts.ready){ document.fonts.ready.then(sizeCard); }
+render();
+</script>
+</body>
+</html>
